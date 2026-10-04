@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dealing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=VT323&family=Manrope:wght@400;500;600&display=swap">
+<style>
+/* Palette: plum-black room, fuchsia Chairman, one neon per agent. Layout: the board table (particle agents in a circle, Chairman in the middle) fills the stage; the meeting runs in a right sidebar (bottom sheet on phones). */
+:root{
+  --c-black:#06020A; --c-ink:#1A0B1F; --c-cream:#F4EEF6; --c-plum:#6A0F7A; --c-accent:#FF2BD1; --c-accent-hover:#FF5ADC; --c-violet:#8B2CFF;
+  --c-active-dot:#FF2B6A; --c-label:#A897AE; --c-ok:#5CFFB0;
+  --white-85:rgba(244,238,246,.85); --white-60:rgba(244,238,246,.6); --white-15:rgba(244,238,246,.15); --white-08:rgba(244,238,246,.08);
+  --glass:rgba(14,6,18,.62);
+  --font-display:"Syne","Arial Black",sans-serif;
+  --font-ui:"VT323","W95FA","Courier New",monospace;
+  --font-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --fs-label:17px; --ls-label:.16em; --r-btn:4px; --side:min(430px,36vw);
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--c-black);color:var(--c-cream);font-family:var(--font-body);overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--c-accent);outline-offset:2px}
+#wash{position:fixed;inset:0;z-index:0;pointer-events:none;background:
+  radial-gradient(50% 55% at var(--wx,32%) 52%, color-mix(in srgb, var(--agent,#FF2BD1) 26%, transparent), transparent 72%),
+  radial-gradient(120% 90% at 0% 100%, rgba(139,44,255,.2), transparent 60%), radial-gradient(80% 60% at 100% 0%, rgba(106,15,122,.25), transparent 60%), var(--c-black);transition:background .8s}
+#stage{position:fixed;inset:0;z-index:1;width:100%;height:100%;display:block}
+#grain{position:fixed;inset:-50%;z-index:2;pointer-events:none;opacity:.1;mix-blend-mode:overlay;background-size:180px 180px;animation:grain 1s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(0,0)}}
+
+.bar{position:fixed;top:0;left:0;right:calc(var(--side) + 24px);z-index:10;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:calc(16px + env(safe-area-inset-top,0px)) 24px 12px}
+.mark{font-family:var(--font-display);font-weight:800;font-size:24px;letter-spacing:-.02em;text-transform:uppercase}
+.status{font-family:var(--font-ui);font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--white-85);display:flex;align-items:center;gap:8px;border:1px solid var(--white-15);border-radius:var(--r-btn);padding:4px 10px}
+.status::before{content:"";width:7px;height:7px;background:var(--c-active-dot);animation:blink 1s steps(2) infinite}
+.back{margin-left:auto;font-family:var(--font-ui);font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--c-label);text-decoration:none}
+.back:hover{color:var(--c-cream)}
+@keyframes blink{50%{opacity:.2}}
+.hint{position:fixed;z-index:10;left:24px;bottom:calc(20px + env(safe-area-inset-bottom,0px));font-family:var(--font-ui);font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:var(--c-label);pointer-events:none;max-width:calc(100% - var(--side) - 80px)}
+.hint b{font-weight:400;color:var(--c-cream)}
+
+#tags{position:fixed;inset:0;z-index:6;pointer-events:none}
+.tag{position:absolute;left:0;top:0;font-family:var(--font-ui);font-size:16px;letter-spacing:.18em;text-transform:uppercase;color:var(--white-85);white-space:nowrap;display:flex;align-items:center;gap:6px;transition:opacity .3s,color .3s}
+.tag::before{content:"";width:6px;height:6px;background:var(--dot)}
+.tag.off{text-decoration:line-through;color:var(--c-label)}
+.tag.talk::after{content:"speaking";margin-left:6px;font-size:13px;color:var(--c-black);background:var(--dot);padding:0 4px}
+#tip{position:fixed;z-index:9;left:0;top:0;pointer-events:none;opacity:0;transition:opacity .2s;background:rgba(10,4,14,.85);border:1px solid var(--white-15);border-radius:8px;padding:8px 11px;max-width:240px}
+#tip b{display:block;font-family:var(--font-display);font-weight:800;font-size:17px;text-transform:uppercase}
+#tip span{display:block;font-size:12.5px;color:var(--white-85);line-height:1.4}
+#tip i{display:block;font-style:normal;font-family:var(--font-ui);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--c-accent);margin-top:4px}
+#toasts{position:fixed;z-index:12;left:24px;bottom:56px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--c-cream);color:var(--c-ink);font-size:13px;padding:9px 13px;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);animation:tin .3s ease;display:flex;gap:8px;align-items:center;max-width:340px}
+.toast::before{content:"✓";font-weight:700;color:#1b8a5a}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* sidebar */
+.side{position:fixed;z-index:11;top:12px;right:12px;bottom:12px;width:var(--side);display:flex;flex-direction:column;background:var(--glass);border:1px solid var(--white-15);border-radius:16px;-webkit-backdrop-filter:blur(18px) saturate(1.2);backdrop-filter:blur(18px) saturate(1.2);overflow:hidden}
+.tabs{display:flex;gap:2px;padding:10px;border-bottom:1px solid var(--white-08);flex:none}
+.tabs button{flex:1;font-family:var(--font-ui);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-label);background:none;border:0;border-radius:4px;padding:5px 4px;cursor:pointer;position:relative}
+.tabs button:hover{color:var(--c-cream)}
+.tabs button.on{background:var(--c-cream);color:var(--c-black)}
+.tabs .badge{display:inline-block;min-width:16px;margin-left:4px;padding:0 4px;background:var(--c-accent);color:#fff;border-radius:8px;font-size:13px;letter-spacing:0}
+.tabs .badge:empty{display:none}
+.panel{flex:1;min-height:0;display:none;flex-direction:column}
+.panel.on{display:flex}
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px 10px;border-bottom:1px solid var(--white-08)}
+.chat-head h2{margin:0;font-family:var(--font-display);font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:-.01em}
+.chat-head p{margin:2px 0 0;font-family:var(--font-ui);font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-label)}
+.seats{display:flex;gap:5px}
+.seat{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--dot);background:var(--dot);cursor:pointer;padding:0}
+.seat.off{background:transparent;opacity:.5}
+.ghost{font-family:var(--font-ui);font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-label);background:none;border:1px solid var(--white-15);border-radius:var(--r-btn);padding:3px 8px;cursor:pointer;white-space:nowrap}
+.ghost:hover{color:var(--c-cream);border-color:var(--white-60)}
+.msgs{flex:1;min-height:0;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin}
+.m{max-width:92%;min-width:0;font-size:14px;line-height:1.5;overflow-wrap:anywhere;animation:tin .3s ease}
+.m.me{align-self:flex-end;background:var(--c-cream);color:var(--c-ink);padding:8px 12px;border-radius:12px 12px 2px 12px}
+.m .who{font-family:var(--font-ui);font-size:15px;letter-spacing:.16em;text-transform:uppercase;display:flex;align-items:center;gap:7px;margin-bottom:2px;color:var(--c-label)}
+.m .who::before{content:"";width:7px;height:7px;background:var(--dot)}
+.m .who em{font-style:normal;color:var(--white-60)}
+.m .txt{color:var(--white-85)}
+.m.ask .txt{color:var(--c-cream)}
+.dots span{display:inline-block;animation:blink .9s steps(2) infinite;font-family:var(--font-ui);font-size:20px}.dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.3s}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:13px;color:var(--c-cream);background:var(--white-08);border:1px solid var(--white-15);border-radius:999px;padding:6px 11px;cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--c-accent)}
+.chip.picked{background:var(--c-accent);border-color:var(--c-accent);color:#fff}
+.chip:disabled{cursor:default}
+.chip:disabled:not(.picked){opacity:.35}
+.decision{border:1px solid rgba(255,43,209,.45);background:linear-gradient(180deg,rgba(255,43,209,.12),rgba(139,44,255,.06));border-radius:12px;padding:12px 13px;animation:tin .4s ease}
+.decision .lbl{font-family:var(--font-ui);font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-accent)}
+.decision h3{margin:4px 0 8px;font-family:var(--font-display);font-weight:800;font-size:17px;line-height:1.2}
+.votes{display:flex;flex-wrap:wrap;gap:6px 10px;margin:0 0 10px;font-family:var(--font-ui);font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--c-label)}
+.votes span{display:flex;align-items:center;gap:5px}
+.votes span::before{content:"";width:8px;height:8px;background:var(--dot);border-radius:50%}
+.votes span.no{color:var(--white-60)}.votes span.yes{color:var(--c-cream)}
+.decision p{margin:0 0 10px;font-size:14px;line-height:1.5;color:var(--c-cream)}
+.act{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--white-08)}
+.act b{display:block;font-size:13px;font-weight:600}
+.act small{display:block;font-size:12px;color:var(--white-60);line-height:1.4}
+.btn{font-family:var(--font-ui);font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--c-accent);border:0;border-radius:var(--r-btn);padding:5px 11px;cursor:pointer}
+.btn:hover{background:var(--c-accent-hover)}
+.btn.done{background:transparent;color:var(--c-ok);border:1px solid rgba(92,255,176,.4);cursor:default}
+.btn.skip{background:transparent;color:var(--c-label);border:1px solid var(--white-15)}
+.starters{display:flex;flex-direction:column;gap:6px;padding:0 16px 10px}
+.starters p{margin:0;font-family:var(--font-ui);font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--c-label)}
+.starters .chip{border-radius:10px}
+.composer{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--white-08);flex:none}
+.composer input{flex:1;min-width:0;font:14px var(--font-body);color:var(--c-cream);background:rgba(0,0,0,.35);border:1px solid var(--white-15);border-radius:var(--r-btn);padding:10px 12px}
+.composer input:focus{outline:none;border-color:var(--c-accent)}
+.composer input::placeholder{color:var(--c-label)}
+.composer .btn{font-size:17px;padding:0 14px}
+.list{flex:1;min-height:0;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.list h4{margin:4px 0 2px;font-family:var(--font-ui);font-weight:400;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-label)}
+.card{border:1px solid var(--white-08);border-radius:10px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-size:13px;color:var(--white-85)}
+.card .dot{width:10px;height:10px;border-radius:50%;background:var(--dot)}
+.card b{display:block;font-family:var(--font-display);font-weight:800;font-size:15px;text-transform:uppercase;color:var(--c-cream)}
+.card small{display:block;color:var(--white-60);font-size:12px;line-height:1.4}
+.agentcard{grid-template-columns:auto 1fr auto;row-gap:8px}
+.agentcard .lvl{grid-column:2/4;display:flex;gap:4px;align-items:center}
+.agentcard .lvl span{font-family:var(--font-ui);font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-label);margin-right:4px}
+.seg{font-family:var(--font-ui);font-size:14px;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid var(--white-15);color:var(--c-label);border-radius:3px;padding:2px 7px;cursor:pointer}
+.seg.on{background:var(--dot);color:var(--c-black);border-color:var(--dot)}
+.agentcard .talk{grid-column:2/4;justify-self:start}
+.sw{width:32px;height:18px;border-radius:9px;background:var(--white-15);position:relative;border:0;cursor:pointer;padding:0}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--c-cream);transition:transform .2s}
+.sw.on{background:var(--c-accent)}.sw.on::after{transform:translateX(14px)}
+.tagx{font-family:var(--font-ui);font-size:13px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--white-15);border-radius:3px;padding:1px 6px;color:var(--c-label)}
+.tagx.new{color:var(--c-accent);border-color:rgba(255,43,209,.5)}
+.empty{font-size:13px;color:var(--white-60);line-height:1.5;padding:8px 0}
+.fine{margin:auto 0 0;padding-top:12px;font-family:var(--font-ui);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--c-label);line-height:1.4}
+
+@media (max-width:760px){
+  :root{--side:auto}
+  .bar{right:0;padding-inline:16px}
+  .back,.status{display:none}
+  .side{left:8px;right:8px;top:auto;bottom:calc(8px + env(safe-area-inset-bottom,0px));width:auto;height:54vh}
+  .hint{display:none}
+  #toasts{left:16px;bottom:auto;top:70px}
+}
+@media (prefers-reduced-motion:reduce){#grain{animation:none}}
+</style>
+<style>[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<div id="wash"></div>
+<canvas id="stage" aria-label="The board table: five agents made of particles around the Chairman"></canvas>
+<div id="grain"></div>
+<div id="tags"></div>
+<div id="tip"><b id="tipN"></b><span id="tipR"></span><i id="tipA"></i></div>
+<div id="toasts" aria-live="polite"></div>
+
+<header class="bar">
+  <div class="mark">Dealing</div>
+  <div class="status" id="status">Board meeting · in session</div>
+  <a class="back" href="index.html">← About Dealing</a>
+</header>
+<div class="hint" id="hint"><b>Click an agent</b> to talk 1:1 · <b>click the Chairman</b> for the full board</div>
+
+<aside class="side" aria-label="Board meeting">
+  <nav class="tabs" role="tablist">
+    <button type="button" data-tab="chat" class="on">Chat</button>
+    <button type="button" data-tab="agents">Agents</button>
+    <button type="button" data-tab="memory">Memory<span class="badge" id="bMem"></span></button>
+    <button type="button" data-tab="actions">Actions<span class="badge" id="bAct"></span></button>
+  </nav>
+
+  <section class="panel on" data-panel="chat">
+    <div class="chat-head">
+      <div><h2 id="cTitle">Full board</h2><p id="cSub">5 seated · the Chairman decides</p></div>
+      <div class="seats" id="seats" aria-label="Who is seated"></div>
+      <button type="button" class="ghost" id="toBoard" hidden>Full board</button>
+      <button type="button" class="ghost" id="newMeet" hidden>New topic</button>
+    </div>
+    <div class="msgs" id="msgs" aria-live="polite"></div>
+    <div class="starters" id="starters"><p>Call a meeting about…</p></div>
+    <form class="composer" id="composer" autocomplete="off">
+      <input id="q" type="text" placeholder="What's going on?" aria-label="Your message">
+      <button class="btn" type="submit" id="send">Send</button>
+    </form>
+  </section>
+
+  <section class="panel" data-panel="agents"><div class="list" id="agentList"><h4>Who sits at the table, and how far gone</h4></div></section>
+  <section class="panel" data-panel="memory"><div class="list" id="memList"><h4>What the board remembers about you</h4></div></section>
+  <section class="panel" data-panel="actions"><div class="list" id="actList"><h4>Things the board can do for you</h4><p class="empty" id="actEmpty">Nothing yet. When the Chairman decides, proposed actions land here and wait for your OK.</p></div></section>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse=matchMedia('(pointer: coarse)').matches;
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ================= agents ================= */
+const AGENTS=[
+  {id:'alcohol',name:'Alcohol',  role:'The uninhibited friend',  does:'Direct, impulsive, brutally honest. Says what everyone else is thinking.', a:'#FFD23F',b:'#FF9F1C',m:2,speed:.5,amp:.12,freq:1.6,size:2.4},
+  {id:'weed',   name:'Marijuana',role:'The associative thinker', does:'Creative, a little distracted. Connects ideas nobody else would.',        a:'#5CFFB0',b:'#D9FFE9',m:0,speed:.32,amp:.16,freq:1.1,size:2.5},
+  {id:'lsd',    name:'LSD',      role:'The reality-bender',      does:'Challenges assumptions and reframes the whole situation.',                a:'#4FD8FF',b:'#B66CFF',m:1,speed:.55,amp:.14,freq:2.2,size:2.2},
+  {id:'aya',    name:'Ayahuasca',role:'The existential one',     does:'Questions your intentions. Are you solving the right problem?',           a:'#FF7A45',b:'#FFC6A0',m:3,speed:.35,amp:.12,freq:1.3,size:2.3},
+  {id:'coke',   name:'Cocaine',  role:'The hyperactive executor',does:'Fast, ambitious, obsessed with making things happen. Now.',              a:'#FFFFFF',b:'#FFB8EE',m:4,speed:1.1,amp:.08,freq:2.0,size:2.0},
+  {id:'chair',  name:'The Chairman',role:'Runs the meeting',     does:'Weighs every argument, remembers you, and makes one decision.',            a:'#FF2BD1',b:'#8B2CFF',m:5,speed:.35,amp:.05,freq:1.4,size:2.4}
+];
+const BY=Object.fromEntries(AGENTS.map(a=>[a.id,a]));
+const MEMBERS=AGENTS.slice(0,5);
+const ORDER=['alcohol','weed','lsd','aya','coke'];
+const LEVELS=['Mild','Strong','Unhinged'];
+const state={seated:Object.fromEntries(ORDER.map(id=>[id,true])), level:Object.fromEntries(ORDER.map(id=>[id,1])), mode:'board', solo:null, speaking:null, busy:false, hovered:null, deciding:false};
+
+/* ================= scenarios ================= */
+const low=s=>s.toLowerCase();
+const SCEN=[
+ {id:'ex', chip:"I want to text my ex. Board meeting. Now.", re:/\bex\b|my ex|text (him|her)|drunk/i, label:'Text the ex tonight?',
+  q:[{by:'aya',text:"Before anything: what do you actually want from this message?",chips:['To get back together','Closure',"Honestly, I'm bored"]},
+     {by:'alcohol',text:"Be honest. How many drinks in are we?",chips:['Zero, stone sober','Two',"Don't ask"]}],
+  lines:{
+   alcohol:a=>a[1]==='Zero, stone sober'?"Sober and still asking? Then it's a no. If you insist, I'll write it so it doesn't sound desperate.":"Then it's the drinks talking, and drinks are terrible at texting. Phone down. I'll hold the draft.",
+   weed:()=>"Okay, hear me out: write it, then turn it into a song. Or a voice memo you never send. Art beats texting, every time.",
+   lsd:()=>"Zoom out. You don't miss them, you miss who you were back then. Text that person. That's you.",
+   aya:a=>`You said "${low(a[0])}". A midnight text won't give you that. A real conversation, sober, in daylight, might.`,
+   coke:()=>"Counterpoint: send it NOW. I've got three drafts and I'm A/B testing them. LET'S GO."},
+  votes:{alcohol:'no',weed:'no',lsd:'no',aya:'no',coke:'yes'},
+  verdict:()=>"Not tonight. I saved Alcohol's draft so nothing's lost, and I'll bring it back Sunday at noon. If you still want to send it then, it's yours.",
+  actions:[{t:'Save draft: message to Sam',d:'"Hey, I\'ve been thinking about us. Coffee sometime this week?"',ok:'Draft saved'},{t:'Remind me Sunday, 12:00',d:'Re-read it sober, in daylight',ok:'Reminder set for Sunday, 12:00'},{t:'Mute Sam until Sunday',d:'Notifications only. They won\'t know',ok:'Sam muted until Sunday'}],
+  memory:a=>[`Wants "${low(a[0])}" from the ex`,'Board vetoed late-night texting']},
+ {id:'bored', chip:"I have $40 and three free hours. Figure something out.", re:/\$|bored|free hours|three hours|plan/i, label:'Go out today?',
+  q:[{by:'coke',text:"Where are you right now? I need coordinates.",chips:['Home','Downtown','Near a park']},
+     {by:'weed',text:"Vibe check: chill, adventure, or social?",chips:['Chill','Adventure','Social']}],
+  lines:{
+   weed:()=>"Thrift-store challenge: $10 each, best outfit wins. Then tacos. Then somewhere high to watch the sunset.",
+   coke:a=>`Found three spots ${a[0]==='Home'?'near you':'around '+low(a[0])}, ranked by fun per dollar. Booking takes two minutes. Say the word.`,
+   alcohol:()=>"Honestly? Call the friend you've been ignoring. Every plan is better with someone who'll laugh at you.",
+   lsd:()=>"Do something you've never done. Three new hours feel longer than three expensive ones.",
+   aya:a=>`Why bored, though? Rest is allowed. But if your body says "${low(a[1])}", go.`},
+  votes:{alcohol:'yes',weed:'yes',lsd:'yes',aya:'no',coke:'yes'},
+  verdict:a=>`A ${low(a[1])} afternoon: thrift challenge ($20) and tacos ($14), back by sunset. Cocaine already found the spots. You keep $6 for emergencies.`,
+  actions:[{t:'Text Dani: "thrift challenge in 30?"',d:"Alcohol's idea. Sends from your number",ok:'Message sent to Dani'},{t:'Add to calendar: 3:00–6:00 PM',d:'"Thrift + tacos" with the spots attached',ok:'Added to your calendar'},{t:'Save 3 spots to Maps',d:'Found by Cocaine',ok:'3 spots saved'}],
+  memory:a=>[`Likes ${low(a[1])} plans on free afternoons`,'Budget for today: $40']},
+ {id:'dinner', chip:"Get me out of this dinner without drama.", re:/dinner|get me out|cancel|bail/i, label:'Skip the dinner?',
+  q:[{by:'lsd',text:"Who's hosting, and what do they think of you right now?",chips:['Close friend','Coworker',"Partner's family"]},
+     {by:'alcohol',text:"Why don't you want to go? Truth only.",chips:["I'm exhausted","I don't like them",'Something better came up']}],
+  lines:{
+   alcohol:a=>a[1]==='Something better came up'?"At least you're honest with me. Do NOT be honest with them about that part.":"Then don't go. Nobody wants a guest who's there in body and gone in spirit.",
+   weed:()=>"What if you send dessert instead of yourself? A cake that says sorry. Iconic.",
+   lsd:a=>`Flip it: what would make your ${low(a[0])} feel good about you not coming? Start there.`,
+   aya:()=>"Is it this dinner, or are you running on empty in general? Answer that first.",
+   coke:()=>"Message drafted, rain-check date picked, bakery that delivers by 7 found. Approve and done."},
+  votes:{alcohol:'yes',weed:'yes',lsd:'yes',aya:'yes',coke:'yes'},
+  verdict:()=>"Skip it, kindly, today. No fake emergency: one honest-enough message, dessert delivered at 7, and a rain check you actually mean.",
+  actions:[{t:'Send message to the host',d:'"I\'m wiped and would be bad company tonight. Can I make it up to you next Thursday?"',ok:'Message sent'},{t:'Order dessert for 7:00 PM',d:'Local bakery, $18',ok:'Dessert ordered for 7:00 PM'},{t:'Hold next Thursday',d:'Calendar hold, confirmed after they reply',ok:'Thursday on hold'}],
+  memory:a=>[`Skipped a dinner with a ${low(a[0])} (${low(a[1])})`]},
+ {id:'date', chip:"This guy just texted me. What do I say?", re:/guy|girl|texted me|date|crush|match/i, label:'Reply now?',
+  q:[{by:'alcohol',text:"What did he say? Roughly.",chips:['"Hey stranger"','"Drinks Friday?"','"Did you get home ok?"']},
+     {by:'aya',text:"And what do you want from him?",chips:['Something serious','Just fun','Not sure yet']}],
+  lines:{
+   alcohol:()=>"Match his energy, don't double it. One line. No essays, no 'haha' padding.",
+   weed:()=>"Reply with a question he can't answer with 'lol'. Like: worst movie you secretly love?",
+   lsd:()=>"You're not choosing words, you're choosing a version of you. Pick the one having fun.",
+   aya:a=>`You said "${low(a[1])}". Write the reply that person would send, not the one scared of losing him.`,
+   coke:()=>"Draft ready: 'Only if you're picking the place. Friday at 8?' Sending in 3, 2... kidding. Your call."},
+  votes:{alcohol:'yes',weed:'yes',lsd:'yes',aya:'no',coke:'yes'},
+  verdict:()=>"Reply within the hour: short, playful, and end with a plan. The board's draft is below. Send it or edit it.",
+  actions:[{t:'Send reply',d:'"Only if you\'re picking the place. Friday at 8?"',ok:'Reply sent'},{t:'Remind me in 1 hour',d:"If you'd rather wait, like Ayahuasca says",ok:'Reminder set for 1 hour'}],
+  memory:a=>[`Dating: wants "${low(a[1])}"`]}
+];
+const GENERIC={id:'gen', label:'Act on it today?',
+  q:[{by:'aya',text:"What would a good outcome look like for you?",chips:['Feel calmer','Get it done','Have fun with it']}],
+  lines:{
+   alcohol:(a,q)=>`Real talk about "${q}": you already know what you want. You're looking for permission. Granted. What's the first move?`,
+   weed:()=>"Three weird ways in: do it backwards, do it with a friend, or make it a one-week experiment.",
+   lsd:()=>"What if the problem is the solution in a disguise? Flip it once and look again.",
+   aya:a=>`You want to "${low(a[0])}". Every option should pass that test. Most won't.`,
+   coke:()=>"Broke it into three steps. The first takes ten minutes. Timer's running."},
+  votes:{alcohol:'yes',weed:'yes',lsd:'yes',aya:'yes',coke:'yes'},
+  verdict:a=>`Start today with one ten-minute step, check in tomorrow, and drop anything that doesn't help you ${low(a[0])}.`,
+  actions:[{t:'Add to-do: first ten-minute step',d:'Due today, 6:00 PM',ok:'To-do added'},{t:'Check in tomorrow, 9:00 AM',d:'The Chairman follows up',ok:'Check-in scheduled'}],
+  memory:a=>[`Goal for this one: ${low(a[0])}`]};
+const SOLO_Q={
+  alcohol:{text:"Want the nice version or the true version?",chips:['Nice','True']},
+  weed:{text:"How wild can the answer get?",chips:['Chill','Medium','Total chaos']},
+  lsd:{text:"Can I flip this upside down first?",chips:['Flip it','Keep it real']},
+  aya:{text:"What do you really want underneath this?",chips:['Connection','Peace','Fun']},
+  coke:{text:"Deadline? I work better with one.",chips:['Tonight','This week','Yesterday']}
+};
+const UNHINGED={
+  alcohol:"ALSO. Order fries. Big decisions need fries.",
+  weed:"...wait. What if we're all just in someone else's group chat right now?",
+  lsd:"Also: time is a flat circle, and so is this decision.",
+  aya:"And call your mother. Unrelated. Or is it?",
+  coke:"I also reorganized your next six months. You're welcome."
+};
+const GREET={
+  alcohol:"Okay, just us. Tell me what's going on and I'll tell you what I actually think.",
+  weed:"Heyyy. Private session. Bring me the problem, I'll bring you twelve ideas. Maybe thirteen.",
+  lsd:"Just you and me. Show me the situation and I'll show you the other side of it.",
+  aya:"We have time. Tell me what's happening, and then what's really happening.",
+  coke:"Private line, let's MOVE. What do you need done?"
+};
+const UNSAFE=/dosage|\bdose|mix(ing)? (drugs|pills)|where (to|can i) (buy|get)|how much (should i|to) (take|smoke|drink)/i;
+
+/* ================= three.js stage ================= */
+const canvas=$('stage');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:false,alpha:true,powerPreference:'high-performance'});
+renderer.setClearColor(0,0);
+const PR=Math.min(devicePixelRatio||1,2); renderer.setPixelRatio(PR);
+const scene=new THREE.Scene(); const camera=new THREE.PerspectiveCamera(45,1,.1,100); camera.position.set(0,0,8);
+let VW=1,VH=1,W=1,H=1;
+
+const NOISE=`
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);
+  vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy;
+  i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+  float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.0*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);
+  vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m;
+  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}`;
+const VERT=NOISE+`
+uniform float uTime,uSpeed,uAmp,uFreq,uMode,uIntensity,uSize,uPR,uMouseStrength,uScale,uOpacity;
+uniform vec3 uMouse,uColorA,uColorB;
+attribute vec4 aRand;
+varying vec3 vColor; varying float vAlpha;
+vec3 hue(float h){return clamp(abs(mod(h*6.0+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.);}
+float h1(vec3 p){return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453);}
+void main(){
+  float t=uTime*uSpeed*(1.0+uIntensity*0.9);
+  vec3 n=normalize(position); vec3 p=position;
+  float nz=snoise(n*uFreq+vec3(0.,t*.6,t*.3));
+  p+=n*nz*uAmp*(1.0+uIntensity*.8);
+  float alpha=0.45+0.55*aRand.z, mixv=0.5+0.5*nz, sizeMul=1.0;
+  if(uMode<0.5){ /* marijuana: smoke that rises and spreads */
+    p*=1.0+0.07*sin(t*0.8);
+    if(aRand.x<0.38){ float life=fract(t*0.11+aRand.y);
+      vec3 drift=vec3(snoise(p*0.7+vec3(t*.2)),0.,snoise(p*0.7+vec3(5.,t*.2,0.)));
+      p+=vec3(0.,life*2.1,0.)+drift*life*1.1; p.xz*=1.0+life*0.7; alpha*=(1.0-life)*0.9; sizeMul=1.0+life*3.0; mixv=1.0; }
+  } else if(uMode<1.5){ /* LSD: breathing web + hue shift */
+    float rings=sin(length(p.xy)*13.0-t*4.0+p.z*6.0);
+    p+=n*rings*0.06*(1.0+uIntensity);
+    p+=vec3(snoise(p*2.0+t),snoise(p*2.0+t+17.),snoise(p*2.0+t+31.))*0.09;
+    alpha*=0.35+0.65*smoothstep(-0.2,1.0,rings);
+  } else if(uMode<2.5){ /* alcohol: sway + drip */
+    p.x+=sin(t*1.1+p.y*1.6)*0.16; p.z+=cos(t*0.9+p.y*1.3)*0.08;
+    if(n.y<-0.05 && aRand.x<0.42){ float life=fract(t*0.17+aRand.y); float k=life*life;
+      p.y-=k*2.4; p.xz*=1.0-k*0.75; alpha*=1.0-smoothstep(0.55,1.0,life); mixv=0.0; }
+  } else if(uMode<3.5){ /* ayahuasca: slow waves that pass through it, spiral, big bokeh */
+    float w=sin(length(p)*7.0-t*2.2);
+    float ang=t*0.35+length(p)*1.6; float c=cos(ang), s=sin(ang);
+    p.xz=mat2(c,-s,s,c)*p.xz;
+    p*=1.0+0.1*w*(1.0+uIntensity);
+    alpha*=0.55+0.45*w; if(aRand.w<0.12){ sizeMul*=2.6; alpha*=0.5; }
+  } else if(uMode<4.5){ /* cocaine: crystalline shells, fast jitter */
+    float r=length(position); r=floor(r*7.0)/7.0+0.06;
+    p=mix(p,n*r*(1.0+nz*.05),0.8);
+    float tick=floor(uTime*14.0*(1.0+uIntensity));
+    p+=(vec3(h1(aRand.xyz+tick),h1(aRand.yzw+tick),h1(aRand.zwx+tick))-.5)*0.07*(1.0+uIntensity*2.0);
+    sizeMul*=0.85;
+  } else { /* chairman: steady, ordered, slow breath */
+    p=mix(p,n*length(position),0.75); p*=1.0+0.035*sin(t*1.4);
+  }
+  if(aRand.w<0.04){ sizeMul*=4.0; alpha*=0.28; }
+  vec3 d=p-uMouse; float dist=length(d);
+  p+=normalize(d+vec3(1e-4))*uMouseStrength*smoothstep(1.15,0.0,dist)*0.55;
+  vec4 mv=modelViewMatrix*vec4(p,1.0);
+  gl_Position=projectionMatrix*mv;
+  gl_PointSize=uSize*uPR*sizeMul*(0.55+aRand.z*0.9)*(0.45+uScale*0.55)*(8.0/-mv.z);
+  vec3 col=mix(uColorA,uColorB,clamp(mixv,0.,1.));
+  if(uMode>0.5&&uMode<1.5){ col=mix(col,hue(fract(aRand.y*0.25+length(p)*0.45+uTime*0.07)),0.5); }
+  vColor=col; vAlpha=alpha*uOpacity;
+}`;
+const FRAG=`varying vec3 vColor; varying float vAlpha;
+void main(){ vec2 c=gl_PointCoord-0.5; float d=length(c); if(d>0.5) discard; gl_FragColor=vec4(vColor,pow(smoothstep(0.5,0.0,d),1.6)*vAlpha); }`;
+
+const COUNT=coarse||innerWidth<760?2600:5200;
+function geom(){ const pos=new Float32Array(COUNT*3), rnd=new Float32Array(COUNT*4);
+  for(let i=0;i<COUNT;i++){ let x,y,z,l; do{x=Math.random()*2-1;y=Math.random()*2-1;z=Math.random()*2-1;l=x*x+y*y+z*z;}while(l>1||l<1e-4);
+    l=Math.sqrt(l); const r=1-Math.pow(Math.random(),3)*.55; pos.set([x/l*r,y/l*r,z/l*r],i*3); rnd.set([Math.random(),Math.random(),Math.random(),Math.random()],i*4); }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('aRand',new THREE.BufferAttribute(rnd,4)); return g; }
+
+const tagsEl=$('tags');
+const ents=AGENTS.map((a,i)=>{
+  const mat=new THREE.ShaderMaterial({vertexShader:VERT,fragmentShader:FRAG,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+    uniforms:{uTime:{value:0},uSpeed:{value:a.speed},uAmp:{value:a.amp},uFreq:{value:a.freq},uMode:{value:a.m},uIntensity:{value:0},uSize:{value:a.size},uPR:{value:PR},
+      uMouseStrength:{value:0},uScale:{value:1},uOpacity:{value:1},uMouse:{value:new THREE.Vector3(99,99,99)},uColorA:{value:new THREE.Color(a.a)},uColorB:{value:new THREE.Color(a.b)}}});
+  const pts=new THREE.Points(geom(),mat); pts.frustumCulled=false;
+  const g=new THREE.Group(); g.add(pts); g.rotation.y=Math.random()*6; scene.add(g);
+  const tag=document.createElement('div'); tag.className='tag'; tag.style.setProperty('--dot',a.a); tag.textContent=a.name; tagsEl.appendChild(tag);
+  return {a,i,g,mat,tag,cur:{x:0,y:0,s:.01,o:0,k:0},tgt:{x:0,y:0,s:1,o:1,k:0},hover:false};
+});
+const EBY=Object.fromEntries(ents.map(e=>[e.a.id,e]));
+
+function stageBox(){ const narrow=W<760; const side=narrow?0:Math.min(430,W*.36)+24;
+  return narrow?{cx:W/2,cy:64+(H*.46-64)/2+6,R:Math.min(W*.27,(H*.46-64)*.4)}:{cx:(W-side)/2,cy:H*.53,R:Math.min((W-side)*.3,H*.33)}; }
+const toWorld=(sx,sy)=>({x:(sx/W-.5)*VW,y:-(sy/H-.5)*VH});
+function layout(){
+  const b=stageBox(), u=VH/H, c=toWorld(b.cx,b.cy), Rw=b.R*u, orb=Rw*.3;
+  ents.forEach(e=>{ const id=e.a.id, t=e.tgt;
+    const talking=state.speaking===id;
+    if(id==='chair'){ t.x=c.x; t.y=c.y; t.s=orb*1.15*(state.deciding?1.3:1)*(e.hover?1.1:1); t.o=state.mode==='solo'?.18:1; t.k=state.deciding?1:(talking?.7:.05); return; }
+    const k=ORDER.indexOf(id), ang=Math.PI/2+k*(Math.PI*2/5);
+    let x=c.x+Math.cos(ang)*Rw*1.25, y=c.y+Math.sin(ang)*Rw;
+    const seated=state.seated[id];
+    let s=orb*(seated?1:.75), o=seated?1:.12, kk=talking?1:(e.hover?.35:.0);
+    kk+= [0,.15,.45][state.level[id]];
+    if(state.mode==='solo'){ if(state.solo===id){ x=c.x+(x-c.x)*.25; y=c.y+(y-c.y)*.25; s=orb*1.55; o=1; } else { o=.14; s=orb*.8; } }
+    if(talking){ x=c.x+(x-c.x)*.8; y=c.y+(y-c.y)*.8; s*=state.mode==='solo'?1.08:1.3; }
+    if(e.hover&&seated) s*=1.1;
+    Object.assign(t,{x,y,s,o,k:kk});
+    e.mat.uniforms.uSpeed.value=e.a.speed*[.6,1,1.8][state.level[id]]*(reduce?.4:1);
+    e.mat.uniforms.uAmp.value=e.a.amp*[.7,1,1.7][state.level[id]];
+  });
+  const focus=state.speaking||state.solo||(state.deciding?'chair':null);
+  document.body.style.setProperty('--agent', focus?BY[focus].a:'#FF2BD1');
+  document.body.style.setProperty('--wx', (b.cx/W*100).toFixed(1)+'%');
+}
+function resize(){ W=innerWidth;H=innerHeight; renderer.setSize(W,H,false); camera.aspect=W/H; camera.updateProjectionMatrix();
+  VH=2*8*Math.tan(THREE.MathUtils.degToRad(22.5)); VW=VH*camera.aspect; layout(); }
+addEventListener('resize',resize); resize();
+
+/* pointer */
+const mouse={x:-9999,y:-9999,last:-1e9};
+const ray=new THREE.Raycaster(), plane=new THREE.Plane(new THREE.Vector3(0,0,1),0), hit=new THREE.Vector3(), ndc=new THREE.Vector2();
+addEventListener('pointermove',ev=>{ mouse.x=ev.clientX; mouse.y=ev.clientY; mouse.last=performance.now(); });
+const screenOf=e=>{ const v=e.g.position.clone().project(camera); return {x:(v.x+1)/2*W,y:(1-v.y)/2*H}; };
+function pickAt(x,y){ let best=null,bd=1e9; ents.forEach(e=>{ if(e.cur.o<.1&&e.a.id!=='chair'&&state.mode!=='solo') return; const s=screenOf(e), r=e.cur.s*H/VH*1.05, d=Math.hypot(s.x-x,s.y-y); if(d<r&&d<bd){bd=d;best=e;} }); return best; }
+canvas.addEventListener('click',ev=>{ const e=pickAt(ev.clientX,ev.clientY); if(!e) return; if(e.a.id==='chair') openBoard(); else openSolo(e.a.id); });
+
+/* grain */
+(function(){ const c=document.createElement('canvas'); c.width=c.height=180; const x=c.getContext('2d'), im=x.createImageData(180,180);
+  for(let i=0;i<im.data.length;i+=4){ const v=Math.random()*255; im.data[i]=im.data[i+1]=im.data[i+2]=v; im.data[i+3]=255; }
+  x.putImageData(im,0,0); $('grain').style.backgroundImage=`url(${c.toDataURL()})`; })();
+
+/* loop */
+const tip=$('tip'); const clock=new THREE.Clock(); let T=0;
+const damp=(c,t,l,dt)=>c+(t-c)*(1-Math.exp(-l*dt));
+function frame(){
+  const dt=Math.min(clock.getDelta(),.05); T+=dt;
+  const h=coarse?null:pickAt(mouse.x,mouse.y);
+  if(h!==state.hovered){ ents.forEach(e=>e.hover=(e===h)); state.hovered=h; layout(); canvas.style.cursor=h?'pointer':'default'; }
+  if(h){ $('tipN').textContent=h.a.name; $('tipR').textContent=h.a.does;
+    $('tipA').textContent=h.a.id==='chair'?'Click for the full board':(state.seated[h.a.id]?`Click to talk 1:1 · ${LEVELS[state.level[h.a.id]]}`:'Not seated · click to talk anyway');
+    const left=mouse.x>W*.55; tip.style.transform=`translate(${left?mouse.x-260:mouse.x+18}px,${mouse.y+14}px)`; tip.style.opacity=1; } else tip.style.opacity=0;
+  if(!coarse){ ndc.set(mouse.x/W*2-1,-(mouse.y/H)*2+1); ray.setFromCamera(ndc,camera); }
+  const moving=(performance.now()-mouse.last)<1400;
+  ents.forEach((e,i)=>{ const c=e.cur,t=e.tgt;
+    c.x=damp(c.x,t.x,3.2,dt); c.y=damp(c.y,t.y+Math.sin(T*.6+i*1.7)*.04,3.2,dt); c.s=damp(c.s,t.s,3.2,dt); c.o=damp(c.o,t.o,2.6,dt); c.k=damp(c.k,t.k,4,dt);
+    e.g.position.set(c.x,c.y,0); e.g.scale.setScalar(Math.max(c.s,.001)); e.g.rotation.y+=dt*(.08+c.k*.25); e.g.rotation.x=Math.sin(T*.2+i)*.25;
+    const u=e.mat.uniforms; u.uTime.value=T; u.uScale.value=c.s; u.uOpacity.value=c.o; u.uIntensity.value=c.k;
+    let ms=0; if(!coarse&&moving){ if(ray.ray.intersectPlane(plane,hit)){ e.g.updateMatrixWorld(); u.uMouse.value.copy(e.g.worldToLocal(hit.clone())); ms=1; } }
+    u.uMouseStrength.value=damp(u.uMouseStrength.value,ms,3,dt);
+    const s=screenOf(e), r=c.s*H/VH;
+    e.tag.style.transform=`translate(${s.x}px,${s.y+r*1.08+4}px) translate(-50%,0)`;
+    e.tag.style.opacity=Math.max(.25,Math.min(1,c.o+.1));
+    e.tag.classList.toggle('off',e.a.id!=='chair'&&!state.seated[e.a.id]);
+    e.tag.classList.toggle('talk',state.speaking===e.a.id);
+  });
+  renderer.render(scene,camera); requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ================= sidebar: tabs, agents, memory, actions ================= */
+document.querySelector('.tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; showTab(b.dataset.tab); });
+function showTab(t){ document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===t)); document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.dataset.panel===t));
+  if(t==='memory') $('bMem').textContent=''; }
+
+const seatsEl=$('seats');
+function renderSeats(){ seatsEl.innerHTML=''; MEMBERS.forEach(a=>{ const b=document.createElement('button'); b.type='button'; b.className='seat'+(state.seated[a.id]?'':' off'); b.style.setProperty('--dot',a.a);
+  b.title=`${a.name}: ${state.seated[a.id]?'seated':'not seated'} (click to toggle)`; b.setAttribute('aria-label',b.title); b.onclick=()=>toggleSeat(a.id); seatsEl.appendChild(b); }); updateHead(); }
+function toggleSeat(id){ const n=ORDER.filter(x=>state.seated[x]).length; if(state.seated[id]&&n<=1){ toast('The board needs at least one member'); return; }
+  state.seated[id]=!state.seated[id]; renderSeats(); renderAgents(); layout(); toast(`${BY[id].name} ${state.seated[id]?'takes a seat':'leaves the table'}`); }
+
+const agentList=$('agentList');
+function renderAgents(){ agentList.querySelectorAll('.card').forEach(n=>n.remove());
+  MEMBERS.forEach(a=>{ const c=document.createElement('div'); c.className='card agentcard'; c.style.setProperty('--dot',a.a);
+    c.innerHTML=`<span class="dot"></span><span><b>${a.name}</b><small>${a.role}. ${a.does}</small></span><button type="button" class="sw ${state.seated[a.id]?'on':''}" aria-label="Seat ${a.name}"></button>
+      <div class="lvl"><span>Chaos</span>${LEVELS.map((l,i)=>`<button type="button" class="seg ${state.level[a.id]===i?'on':''}" data-l="${i}">${l}</button>`).join('')}</div>
+      <button type="button" class="ghost talk">Talk 1:1 →</button>`;
+    c.querySelector('.sw').onclick=()=>toggleSeat(a.id);
+    c.querySelectorAll('.seg').forEach(b=>b.onclick=()=>{ state.level[a.id]=+b.dataset.l; renderAgents(); layout(); toast(`${a.name} set to ${LEVELS[state.level[a.id]]}`); });
+    c.querySelector('.talk').onclick=()=>{ showTab('chat'); openSolo(a.id); };
+    agentList.appendChild(c); });
+  const f=agentList.querySelector('.fine')||Object.assign(document.createElement('p'),{className:'fine'}); f.textContent='Agents are personalities, not substances. Nobody here consumes anything, and the board never gives advice about using.'; agentList.appendChild(f); }
+
+const memList=$('memList');
+function addMem(text,isNew){ const c=document.createElement('div'); c.className='card'; c.style.setProperty('--dot','#FF2BD1');
+  c.innerHTML=`<span class="dot"></span><span></span><span class="tagx ${isNew?'new':''}">${isNew?'New':'Example'}</span>`; c.children[1].textContent=text;
+  if(isNew){ memList.insertBefore(c,memList.children[1]); const b=$('bMem'); b.textContent=(+b.textContent||0)+1; } else memList.appendChild(c); }
+['Broke up with Sam three months ago','Prefers short, direct answers','Fun budget this month: $200','Hates confrontation, loves humor'].forEach(t=>addMem(t,false));
+
+const actList=$('actList'); let pending=0;
+function setActBadge(){ $('bAct').textContent=pending||''; }
+function actionRow(a,container,linked){
+  const r=document.createElement('div'); r.className='act';
+  r.innerHTML=`<span><b></b><small></small></span><span style="display:flex;gap:6px"><button type="button" class="btn">Approve</button></span>`;
+  r.querySelector('b').textContent=a.t; r.querySelector('small').textContent=a.d;
+  const btn=r.querySelector('.btn');
+  btn.onclick=()=>approve(a);
+  a.btns=(a.btns||[]).concat(btn);
+  container.appendChild(r); return r;
+}
+function addActions(list){
+  $('actEmpty').hidden=true;
+  list.forEach(a=>{ const c=document.createElement('div'); c.className='card'; c.style.setProperty('--dot','#FF2BD1'); c.style.gridTemplateColumns='1fr'; actionRow(a,c); actList.insertBefore(c,actList.children[1]); pending++; });
+  setActBadge();
+}
+function approve(a){ if(a.done) return; a.done=true; pending=Math.max(0,pending-1); setActBadge();
+  a.btns.forEach(b=>{ b.className='btn done'; b.textContent='Done'; b.disabled=true; }); toast(a.ok); }
+
+const toasts=$('toasts');
+function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; toasts.appendChild(d); setTimeout(()=>d.remove(),3200); }
+
+/* ================= chat engine ================= */
+const msgs=$('msgs'), input=$('q'), form=$('composer'), starters=$('starters');
+let run=0, waiting=null;
+function updateHead(){
+  const n=ORDER.filter(x=>state.seated[x]).length;
+  if(state.mode==='solo'){ const a=BY[state.solo]; $('cTitle').textContent=a.name; $('cSub').textContent=`Private session · ${LEVELS[state.level[a.id]]}`; seatsEl.hidden=true; $('toBoard').hidden=false; input.placeholder=`Tell ${a.name} what's going on…`; $('status').textContent=`Private session · ${a.name}`; }
+  else { $('cTitle').textContent='Full board'; $('cSub').textContent=`${n} seated · the Chairman decides`; seatsEl.hidden=false; $('toBoard').hidden=true; input.placeholder="What's going on?"; $('status').textContent='Board meeting · in session'; }
+}
+$('toBoard').onclick=()=>openBoard();
+function scroll(){ msgs.scrollTop=msgs.scrollHeight; }
+function userMsg(t){ const d=document.createElement('div'); d.className='m me'; d.textContent=t; msgs.appendChild(d); scroll(); }
+function bubble(a,ask){ const d=document.createElement('div'); d.className='m'+(ask?' ask':''); d.style.setProperty('--dot',a.a);
+  d.innerHTML=`<div class="who"></div><div class="txt"><span class="dots"><span>·</span><span>·</span><span>·</span></span></div>`;
+  d.querySelector('.who').textContent=a.name; if(ask){ const em=document.createElement('em'); em.textContent='· asks'; d.querySelector('.who').append(' ',em); }
+  msgs.appendChild(d); scroll(); return d; }
+async function say(id,text,rid,ask){
+  const a=BY[id]; state.speaking=id; layout();
+  const d=bubble(a,ask); await sleep(reduce?150:500+Math.random()*450); if(rid!==run) return null;
+  const tx=d.querySelector('.txt'); tx.textContent='';
+  const speed=id==='coke'?5:(id==='weed'?2:3);
+  if(reduce) tx.textContent=text; else for(let i=0;i<text.length;i+=speed){ if(rid!==run) return null; tx.textContent=text.slice(0,i+speed); if(i%18===0) scroll(); await sleep(14); }
+  tx.textContent=text; scroll(); state.speaking=null; layout(); return d;
+}
+async function askQ(id,qObj,rid){
+  const d=await say(id,qObj.text,rid,true); if(!d) return null;
+  const box=document.createElement('div'); box.className='chips';
+  qObj.chips.forEach(c=>{ const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=c; b.onclick=()=>waiting&&waiting(c,b); box.appendChild(b); });
+  d.appendChild(box); scroll(); state.speaking=id; layout();
+  const ans=await new Promise(res=>{ waiting=(v,btn)=>{ waiting=null; box.querySelectorAll('button').forEach(x=>{x.disabled=true; if(x===btn) x.classList.add('picked');}); if(!btn) box.querySelectorAll('button').forEach(x=>x.disabled=true); res(v); }; });
+  state.speaking=null; layout();
+  if(rid!==run) return null;
+  userMsg(ans); return ans;
+}
+function pickScenario(q){ return SCEN.find(s=>s.chip===q)||SCEN.find(s=>s.re.test(q))||GENERIC; }
+function decisionCard(s,ans,votes,rid){
+  const d=document.createElement('div'); d.className='decision';
+  const yes=Object.values(votes).filter(v=>v==='yes').length, no=Object.values(votes).filter(v=>v==='no').length;
+  const headline=yes>=no?'Yes':'No';
+  d.innerHTML=`<div class="lbl">The Chairman · final decision</div><h3></h3><div class="votes"></div><p></p><div class="acts"></div>`;
+  d.querySelector('h3').textContent=`${s.label} ${headline}. (${Math.max(yes,no)}–${Math.min(yes,no)})`;
+  const vEl=d.querySelector('.votes');
+  ORDER.filter(id=>votes[id]).forEach(id=>{ const sp=document.createElement('span'); sp.className=votes[id]; sp.style.setProperty('--dot',BY[id].a); sp.textContent=`${BY[id].name} ${votes[id]}`; vEl.appendChild(sp); });
+  d.querySelector('p').textContent=s.verdict(ans);
+  const acts=s.actions.map(a=>({...a,btns:[],done:false}));
+  acts.forEach(a=>actionRow(a,d.querySelector('.acts')));
+  msgs.appendChild(d); scroll(); addActions(acts);
+  (s.memory?s.memory(ans):[]).forEach(t=>addMem(t,true));
+  toast('Memory updated');
+}
+async function boardMeeting(q,rid){
+  if(UNSAFE.test(q)){ await say('chair',"The board doesn't do that one: no doses, no mixing, no sourcing. If this is about your health, please talk to a professional. Bring us anything else.",rid); return; }
+  const s=pickScenario(q), seated=ORDER.filter(id=>state.seated[id]);
+  await say('chair',`Board meeting called: "${q.length>60?q.slice(0,60)+'…':q}". ${seated.length} seated. Quick questions before we vote.`,rid); if(rid!==run) return;
+  const ans=s.q.map(x=>x.chips[0]);
+  for(let i=0;i<s.q.length;i++){ const qq=s.q[i], asker=state.seated[qq.by]?qq.by:'chair'; const a=await askQ(asker,qq,rid); if(a===null||rid!==run) return; ans[i]=a; await sleep(250); }
+  await say('chair','Thank you. Floor is open.',rid); if(rid!==run) return;
+  for(const id of seated){ const lvl=state.level[id]; let line=s.lines[id](ans,q); if(lvl===2) line+=' '+UNHINGED[id];
+    await say(id,line,rid); if(rid!==run) return; await sleep(200); }
+  state.deciding=true; layout(); await sleep(reduce?100:1100); if(rid!==run) return;
+  const votes={}; seated.forEach(id=>votes[id]=s.votes[id]);
+  decisionCard(s,ans,votes,rid); state.deciding=false; layout();
+}
+async function soloSession(q,rid){
+  const id=state.solo;
+  if(UNSAFE.test(q)){ await say(id,"Nope, not going there. No doses, no sourcing, nothing like that. Bring me anything else.",rid); return; }
+  const s=pickScenario(q), ans=s.q.map(x=>x.chips[0]);
+  const own=s.q.findIndex(x=>x.by===id);
+  if(own>=0){ const a=await askQ(id,s.q[own],rid); if(a===null) return; ans[own]=a; }
+  else { const a=await askQ(id,SOLO_Q[id],rid); if(a===null) return; }
+  let line=s.lines[id](ans,q); if(state.level[id]===2) line+=' '+UNHINGED[id];
+  await say(id,line,rid); if(rid!==run) return;
+  await say(id,"Want me to handle the first part?",rid); if(rid!==run) return;
+  const d=document.createElement('div'); d.className='decision'; d.innerHTML=`<div class="lbl">${BY[id].name} · proposed action</div><div class="acts"></div>`;
+  const a={...s.actions[0],btns:[],done:false}; actionRow(a,d.querySelector('.acts')); msgs.appendChild(d); scroll(); addActions([a]);
+  const more=document.createElement('div'); more.className='chips';
+  const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent='Take this to the full board →'; b.onclick=()=>{ openBoard(false); go(q); }; more.appendChild(b); d.appendChild(more);
+}
+async function go(q){
+  q=q.trim(); if(!q) return;
+  if(waiting){ waiting(q,null); input.value=''; return; }
+  if(state.busy) return;
+  state.busy=true; starters.hidden=true; input.value=''; userMsg(q); const rid=++run;
+  try{ if(state.mode==='solo') await soloSession(q,rid); else await boardMeeting(q,rid); } finally { if(rid===run){ state.busy=false; state.speaking=null; state.deciding=false; layout(); $('newMeet').hidden=false; } }
+}
+form.addEventListener('submit',e=>{ e.preventDefault(); go(input.value); });
+SCEN.forEach(s=>{ const b=document.createElement('button'); b.type='button'; b.className='chip'; b.textContent=s.chip; b.onclick=()=>go(s.chip); starters.appendChild(b); });
+
+function reset(){ run++; waiting=null; state.busy=false; state.speaking=null; state.deciding=false; msgs.innerHTML=''; starters.hidden=false; $('newMeet').hidden=true; }
+$('newMeet').onclick=()=>{ if(state.mode==='solo') openSolo(state.solo); else openBoard(); };
+function openBoard(greet=true){ reset(); state.mode='board'; state.solo=null; updateHead(); layout(); showTab('chat');
+  if(greet){ const rid=run; say('chair',"The board is assembled. Tell us what's going on, or pick something below. Click any agent on the table to talk to them alone.",rid); } }
+function openSolo(id){ reset(); state.mode='solo'; state.solo=id; updateHead(); layout(); showTab('chat'); const rid=run; say(id,GREET[id],rid); }
+
+renderSeats(); renderAgents(); openBoard();
+})();
+</script>
+
+</body>
+</html>
